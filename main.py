@@ -1,17 +1,21 @@
 import pandas as pd
+import copy
 from typing import List
+
 
 class Cluster:
     def __init__(self, id):
         self.id = id
         self.ocorrencias = pd.DataFrame(columns=['cor', 'nucleos', 'caudas'])
-        self.filhos:List[Cluster] = []
+        self.filhos: List[Cluster] = []
         self.p_cluster = 0
-        self.p_total= 0
-        self.uc = 0
+        self.p_total = 0
+        # self.uc = 0
+        self.n_filhos = 0
 
     def add_filho(self, filho):
         self.filhos.append(filho)
+        self.n_filhos += 1
 
     def remove_filho(self, filho):
         self.filhos.remove(filho)
@@ -61,16 +65,8 @@ class Cluster:
             p_dict = self.calcula_p_atributo(c, oc)
             total = p_dict["soma"]
             p_total += total
-        self.p_total =p_total
+        self.p_total = p_total
         return p_total
-
-    def calcula_uc(self, todas_ocorrencias):
-        uc = 0
-        for item in self.filhos:
-            item.calcula_p_cluster()
-            uc += (item.p_cluster - self.calcula_p_total(todas_ocorrencias)) * len(item.ocorrencias)/len(todas_ocorrencias)
-        self.uc = uc / len(self.filhos) if len(self.filhos) > 0 else 3
-        return uc
 
 
 class Ocorrencia:
@@ -85,53 +81,109 @@ class Ocorrencia:
 
 
 class Cobweb:
-    def __init__(self, todas_ocorrencias):
-        self.c0 = Cluster('c0')
-        self.c0.uc = 0
-        self.todas_ocorrencias =  pd.DataFrame(columns=['cor', 'nucleos', 'caudas'])
+    def __init__(self):
+        self.raiz = Cluster('raiz')
+        self.uc = 0
+        self.todas_ocorrencias = pd.DataFrame(
+            columns=['cor', 'nucleos', 'caudas'])
 
     def nova_ocorrencia(self, ocorrencia):
         self.todas_ocorrencias = pd.concat(
             [self.todas_ocorrencias, ocorrencia], ignore_index=True)
-        
+
+    def calcula_uc(self):
+        uc = 0
+        for cluster in self.raiz.filhos:
+            cluster.calcula_p_cluster()
+            uc += (cluster.p_cluster - cluster.calcula_p_total(self.todas_ocorrencias)
+                   ) * cluster.ocorrencias.shape[0]/self.todas_ocorrencias.shape[0]
+        self.uc = uc / self.raiz.n_filhos if self.raiz.n_filhos > 0 else 3
+        return self.uc
+
+    def sao_iguais(dict1: dict, dict2: dict) -> bool:
+        if set(dict1.keys()) != set(dict2.keys()):
+            return False
+
+        for key in dict1:
+            if dict1[key] != dict2[key]:
+                return False
+        return True
+
     def escolhe_situacao(self):
         pass
-        
+
+    def calcula_s1(self, oc):
+        # s1 colocar em cluster existente, baseado na posição do array
+        s1 = []
+        temp = copy.deepcopy(self)
+        for i in range(temp.raiz.n_filhos):
+            temp.raiz.filhos[i].add_ocorrencia(oc)
+            uc = temp.calcula_uc()
+            s1.append({'estrategia' : 's1', 'index' : i, 'uc' : uc})
+            temp = copy.deepcopy(self)
+        maior_uc = max(s1, key=lambda x: x["uc"])
+        return maior_uc
+    
+    def fazer_s1(self, index: int, oc):
+        self.raiz.filhos[index].add_ocorrencia(oc)
+        self.calcula_uc()
+
+    def fazer_s2(self, oc):
+        cluster = Cluster(f'c{self.raiz.n_filhos + 1}')
+        cluster.add_ocorrencia(oc)
+        self.raiz.add_filho(cluster)
+        self.calcula_uc()
+    
+    def calcula_s2(self, oc):
+        # s2 colocar em novo cluster
+        temp = copy.deepcopy(self)
+        s2 = 0  
+        cluster = Cluster(f'c{self.raiz.n_filhos+1}')
+        cluster.add_ocorrencia(oc)
+        temp.raiz.add_filho(cluster)
+        s2 = temp.calcula_uc()
+        return {'estrategia' : 's2', 'uc': s2}
+    
+    def calcula_s3(self, oc):
+        # s3 merge clusters
+        pass
+
+    def calcula_s4(self, oc):
+        # s4 split clusters
+        pass
 
     def start(self, oc):
-        c0 = self.c0
+        raiz = self.raiz
+        raiz.add_ocorrencia(oc)
         self.nova_ocorrencia(oc)
+        
+        if raiz.n_filhos == 0 and raiz.ocorrencias.shape[0] == 1:
+            self.calcula_uc()
 
-        if len(c0.filhos)==0 and len(self.todas_ocorrencias)==1:
-            c0.calcula_uc(self.todas_ocorrencias)
-            
-        elif len(c0.filhos)==0 and len(self.todas_ocorrencias)>1:
+        elif raiz.n_filhos == 0 and raiz.ocorrencias.shape[0] > 1:
             c1 = Cluster('c1')
-            c1.add_ocorrencia(self.todas_ocorrencias.iloc[[0]])
-            
-            c2=Cluster('c2')
+            c1.add_ocorrencia(raiz.ocorrencias.iloc[[0]])
+
+            c2 = Cluster('c2')
             c2.add_ocorrencia(oc)
-            
-            c0.add_filho(c1)
-            c0.add_filho(c2)            
+
+            raiz.add_filho(c1)
+            raiz.add_filho(c2)
         else:
-            print("aqui")
-            #c0.filhos[0].add_ocorrencia(oc)                
-            c3=Cluster('c3')
-            c3.add_ocorrencia(oc)
-            c0.add_filho(c3)
-        c0.calcula_uc(self.todas_ocorrencias)
-        # print(self.todas_ocorrencias)
-        print(f'p: {c0.p_total} uc: {c0.uc}')
-
-
-
-# c1.add_ocorrencia(ocorrencias.iloc[[2]])
-# c2.add_ocorrencia(ocorrencias.iloc[[1]])
+            s1 = self.calcula_s1(oc)                        
+            s2 = self.calcula_s2(oc)                        
+            ucs = [s1, s2]
+            estrategia_esolhida = max(ucs, key=lambda x: x["uc"])
+            if estrategia_esolhida['estrategia'] == 's1':
+                self.fazer_s1(estrategia_esolhida['index'], oc)
+            elif estrategia_esolhida['estrategia'] == 's2':
+                self.fazer_s2(oc)
+        self.calcula_uc()
+        print(f'uc: {self.uc} filhos: {self.raiz.n_filhos}')
+        print(f'{self.todas_ocorrencias}')
 
 ocorrencias = pd.read_csv('tabela.csv')
-cobweb = Cobweb(ocorrencias)
+cobweb = Cobweb()
 cobweb.start(ocorrencias.iloc[[0]])
 cobweb.start(ocorrencias.iloc[[1]])
 cobweb.start(ocorrencias.iloc[[2]])
-
