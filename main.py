@@ -161,32 +161,31 @@ class Cobweb:
         else:
             melhor_filho = self.calcula_melhor_filho(cluster, oc)
             uc_novo_filho = self.calcula_novo_filho(cluster, oc)
-            merge = self.calcula_merge(cluster)
-            split = self.calcula_split(cluster)
+            # merge = self.calcula_merge(cluster)
+            # split = self.calcula_split(cluster)
 
-            ucs = [melhor_filho, uc_novo_filho,merge]
+            ucs = [melhor_filho, uc_novo_filho]
             s = max(ucs, key=lambda x: x['uc'])
 
             if s['s'] == 'novo':
                 self.estrategia_novo_filho(cluster, oc)
-                print('novo')
                 self.calcula_uc(cluster)
             elif s['s'] == 'melhor':
                 cluster.filhos[melhor_filho['index']].add_ocorrencia(oc)
                 self.calcula_uc(cluster)
-            elif s['s'] == 'merge':
-                print('merge')
-                c = self.estrategia_merge(
-                    cluster.filhos[0], cluster.filhos[1])
-                cluster.add_filho(c)
-                self.start(c, oc)
+            # elif s['s'] == 'merge':
+            #     print('merge')
+            #     c = self.estrategia_merge(
+            #         cluster.filhos[0], cluster.filhos[1])
+            #     cluster.add_filho(c)
+            #     self.start(c, oc)
             # elif s['s'] == 'split':
             #     print('split')
             #     self.estrategia_split(
             #         cluster, cluster.filhos[split['index']])
             #     self.start(cluster, oc)
 
-        print(f'{cluster.uc}')
+        print(str(cluster))
 
 
 ocorrencias = pd.read_csv('tabela.csv')
